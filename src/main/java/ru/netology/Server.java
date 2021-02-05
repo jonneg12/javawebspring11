@@ -1,6 +1,9 @@
 package ru.netology;
 
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
@@ -12,49 +15,46 @@ import java.util.List;
 public class Server {
 
     private int port;
-    final List<String> validPaths = Arrays.asList("/index.html", "/spring.svg", "/spring.png");
-    final String filesPath = "files";
+    private int numberOfThreads;
 
+    private final List<String> validPaths = Arrays.asList("/index.html", "/spring.svg", "/spring.png");
+    private final String filesPath = "files";
 
-    public Server(int port) {
+    public Server(int port, int numberOfThreads) {
         this.port = port;
+        this.numberOfThreads = numberOfThreads;
     }
-
 
     public ServerSocket getServerSocket() throws IOException {
         return new ServerSocket(port);
     }
 
-
-    public void requestProcessing(ServerSocket serverSocket) throws IOException {
-        System.out.println("start processing " + Thread.currentThread().getName());
+    public void connectionExecutor(Socket socket) {
         try (
-                final Socket socket = serverSocket.accept();
-                final BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                final BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
-            final String requestLine = in.readLine();
+                final BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                final BufferedOutputStream writer = new BufferedOutputStream(socket.getOutputStream())) {
+
+            final String requestLine = reader.readLine();
             final String[] parts = requestLine.split(" ");
 
             System.out.println("continue processing " + Thread.currentThread().getName());
 
-            // There must be definitely 3 parts
+            //проверка правильности запроса
             if (parts.length != 3) {
-                //just close socket
                 return;
             }
 
             final String path = parts[1];
             System.out.println(path);
-
             if (!validPaths.contains(path)) {
-                out.write((
+                writer.write((
                         "HTTP/1.1 404 Not Found\r\n" +
                                 "Content-Length: 0\r\n" +
                                 "Connection: close\r\n" +
                                 "\r\n"
                 ).getBytes());
-                out.flush();
-                System.out.println(404);
+                writer.flush();
+                System.out.println(404 + " not found");
                 return;
             }
 
@@ -62,17 +62,25 @@ public class Server {
             final String mimeType = Files.probeContentType(filePath);
             final long length = Files.size(filePath);
 
-            out.write((
+            writer.write((
                     "HTTP/1.1 200 OK\r\n" +
                             "Content type : " + mimeType + "\r\n" +
                             "Content-Length: " + length + "\r\n" +
                             "Connection: close\r\n" +
                             "\r\n"
             ).getBytes());
-            Files.copy(filePath, out);
-            out.flush();
+            Files.copy(filePath, writer);
+            writer.flush();
+
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
+
