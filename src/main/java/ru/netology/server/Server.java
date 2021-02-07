@@ -6,6 +6,7 @@ import ru.netology.server.request.Request;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -33,7 +34,6 @@ public class Server {
         }
     });
 
-
     public Server(int threadPoolSize) {
         this.executorService = Executors.newFixedThreadPool(threadPoolSize);
         this.handlers = new ConcurrentHashMap<>();
@@ -46,7 +46,6 @@ public class Server {
         }
         handlers.get(method).put(path, handler);
     }
-
 
     public void listen(int port) {
 
@@ -71,6 +70,12 @@ public class Server {
             {
                 Request request = Request.fromInputStream(in);
 
+                //getQueryParams() demo
+                System.out.println(request.getQueryParams().toString());
+
+                //getQueryParam() demo
+                System.out.println(request.getQueryParam("a"));
+
                 Map<String, Handler> pathToHandlerMap = handlers.get(request.getMethod());
                 if (pathToHandlerMap == null) {
                     notFoundHandler.handle(request, out);
@@ -82,13 +87,11 @@ public class Server {
                     notFoundHandler.handle(request, out);
                     return;
                 }
-
                 handler.handle(request, out);
 
             }
-        } catch (IOException e) {
+        } catch (IOException | URISyntaxException e) {
             e.printStackTrace();
         }
     }
-
 }
